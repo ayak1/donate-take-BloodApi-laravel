@@ -17,14 +17,9 @@ class DonateScheduleController extends Controller
     {
         $this->middleware('blood_compare')->only('store');
     }
-    /**
-     * Display a listing of the resource.
-     *
-     * @return \Illuminate\Http\Response
-     */
+    //  function get all the donates
     public function index()
     {
-        //
         $donates_schedule = donate_schedule::with('user','blood_type')->get();
         return response()->json([
             "message"=>trans('response.test'),
@@ -32,16 +27,12 @@ class DonateScheduleController extends Controller
         ], Response::HTTP_ACCEPTED);
     }
 
-    /**
-     * Store a newly created resource in storage.
-     *
-     * @param  \Illuminate\Http\Request  $request
-     * @return \Illuminate\Http\Response
-     */
+    //  fuction get all the donates created today 
+    //  i will redefindet to make doner add date the he will donate at 
+    //  and get all the donate that booked today
     public function todayDonateScheduale()
     {
-        //
-        $donates_schedule = donate_schedule::whereDate("created_at",Carbon::now())->with('user','blood_type')->get();
+        $donates_schedule = donate_schedule::whereDate("created_at",'>=', Carbon::today())->with('user','blood_type')->get();
         return response()->json([
             "message"=>trans('response.test'),
             "data"=>$donates_schedule,
@@ -50,10 +41,6 @@ class DonateScheduleController extends Controller
 
     public function store(StoreDonateRequest $request)
     {
-            // return response()->json([
-            //     "message"=>"you can't donate now you have to wait for one week btween donates",
-            // ], Response::HTTP_ACCEPTED);
-        
             $donate_schedule = donate_schedule::create([
                 "user_id"=>$request->user_id,
                 "amount"=>$request->amount,
@@ -64,24 +51,10 @@ class DonateScheduleController extends Controller
                 "message"=>"created successfully",
                 "data"=>$donate_schedule,
             ], Response::HTTP_ACCEPTED);
-        
     }
-
-    /**
-     * Display the specified resource.
-     *
-     * @param  \App\Models\donate_schedule  $donate_schedule
-     * @return \Illuminate\Http\Response
-     */
+    //  function get specific donate information
     public function show( $donate_schedule_id )
     {
-        
-        //get data for record in DB
-
-        // i can get the record like this #1
-        // $donate = donate_schedule::find($donate_schedule_id)->with('user','blood_type');
-
-        // or like this #2
         $donate = donate_schedule::where('id',$donate_schedule_id)->with('user','blood_type')->get();
 
         if (is_null($donate)) {
@@ -94,18 +67,9 @@ class DonateScheduleController extends Controller
                 "data"=>$donate,
             ], Response::HTTP_ACCEPTED);
     }
-
-
-    /**
-     * Update the specified resource in storage.
-     *
-     * @param  \Illuminate\Http\Request  $request
-     * @param  \App\Models\donate_schedule  $donate_schedule
-     * @return \Illuminate\Http\Response
-     */
+    // function update donate amount
     public function update(Request $request,  $donate_schedule_id)
     {
-        //update record
         $request->validate([
             "amount"=>"required|min:1|integer",
         ]);
@@ -117,7 +81,7 @@ class DonateScheduleController extends Controller
             ], Response::HTTP_NOT_FOUND); 
         }
         else{
-        donate_schedule::where('id',$donate_schedule_id)->update([
+        $donate->update([
             "amount"=>$request->amount
         ]);
         return response()->json([
@@ -126,13 +90,7 @@ class DonateScheduleController extends Controller
          }
          
     }
-
-    /**
-     * Remove the specified resource from storage.
-     *
-     * @param  \App\Models\donate_schedule  $donate_schedule
-     * @return \Illuminate\Http\Response
-     */
+    // function delete donate 
     public function destroy( $donate_schedule_id)
     {
         $donate=donate_schedule::where('id',$donate_schedule_id)->delete();
@@ -141,15 +99,17 @@ class DonateScheduleController extends Controller
             'data' => $donate,
         ], Response::HTTP_OK);
     }
+    // function to check that donate process is done 
+    // then delete this donate from schedule
     public function checkDonate( $donate_schedule_id)
     {
         $d=donate_schedule::select('blood_type_id')->where('id',$donate_schedule_id)->value('blood_type_id');
         $dA = donate_schedule::select('amount')->where('id',$donate_schedule_id)->value('amount');
-        $this->destroy($donate_schedule_id);
         $prevAmount=BloodTypes::select('amount')->where('id',$d)->value('amount');
-        $t=BloodTypes::select('amount')->where('id',$d)->update([
+        BloodTypes::select('amount')->where('id',$d)->update([
             'amount'=> $prevAmount+$dA
         ]);
+        $this->destroy($donate_schedule_id);
         return response()->json([
             'message' => "this donate checked success",
         ], Response::HTTP_OK);

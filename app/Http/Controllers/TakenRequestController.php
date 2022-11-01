@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\StoreDonateRequest;
 use App\Models\BloodTypes;
 use App\Models\taken_request;
 use Illuminate\Http\Request;
@@ -11,24 +12,14 @@ use Symfony\Component\HttpFoundation\Response;
 
 class TakenRequestController extends Controller
 {
-    /**
-     * Display a listing of the resource.
-     *
-     * @return \Illuminate\Http\Response
-     */
+  
     public function __construct()
     {
         $this->middleware('blood_compare')->only('store');
     }
-    /**
-     * Display a listing of the resource.
-     *
-     * @return \Illuminate\Http\Response
-     */
+ 
     public function index()
     {
-        //
-
         $taken_requests = taken_request::with('user','blood_type')->get();
         return response()->json([
             "message"=>"these all taken request",
@@ -36,31 +27,19 @@ class TakenRequestController extends Controller
         ], Response::HTTP_ACCEPTED);
     }
 
-    /**
-     * Store a newly created resource in storage.
-     *
-     * @param  \Illuminate\Http\Request  $request
-     * @return \Illuminate\Http\Response
-     */
-    public function store(Request $request)
+    public function store(StoreDonateRequest $request)
     {
-        
-        $request->validate([
-            "user_id"=>"required|exists:users,id",
-            "amount"=>"required|min:1",
-            "blood_type_id"=>"required|exists:blood_types,id",
-            "verified"=>"nullable",
-        ]);
-        $t=BloodTypes::select('amount')->where('id',$request->blood_type_id)->value('amount');
-        if($t>=$request->amount){
+       
+        $amountOfThisType=BloodTypes::select('amount')->where('id',$request->blood_type_id)->value('amount');
+        if($amountOfThisType>=$request->amount){
         $taken_request= taken_request::create([
             "user_id"=>$request->user_id,
             "amount"=>$request->amount,
             "blood_type_id"=>$request->blood_type_id,
             "verified"=>false,
         ]);
-        $t=BloodTypes::select('amount')->where('id',$request->blood_type_id)->update([
-            'amount'=>$t-$request->amount
+        $amountOfThisType=BloodTypes::select('amount')->where('id',$request->blood_type_id)->update([
+            'amount'=>$amountOfThisType-$request->amount
         ]);
 
         return response()->json([
@@ -70,18 +49,12 @@ class TakenRequestController extends Controller
         else{
             return response()->json([
                 "message"=>"there is no enough amount",
-                "data"=>$t
+                "data"=>$amountOfThisType
             ], Response::HTTP_REQUEST_ENTITY_TOO_LARGE);
         }
        
     }
 
-    /**
-     * Display the specified resource.
-     *
-     * @param  \App\Models\taken_request $donate_schedule
-     * @return \Illuminate\Http\Response
-     */
     public function show( $taken_request_id)
     {
         //get data for record in DB
@@ -97,13 +70,6 @@ class TakenRequestController extends Controller
             ], Response::HTTP_ACCEPTED);
     }
 
-    /**
-     * Update the specified resource in storage.
-     *
-     * @param  \Illuminate\Http\Request  $request
-     * @param  \App\Models\taken_request $donate_schedule
-     * @return \Illuminate\Http\Response
-     */
     public function update(Request $request,  $taken_request_id)
     {
         //update record
@@ -117,18 +83,11 @@ class TakenRequestController extends Controller
             ], Response::HTTP_NOT_FOUND); 
         }
         else{
-        // taken_request::where('id',$taken_request_id)->update([
-        //     "amount"=>$request->amount
-        // ]);
         $t=BloodTypes::select('amount')->where('id',$taken->blood_type_id)->value('amount');
         if($t>=$request->amount){
         $taken->update([
             "amount"=>$request->amount,
         ]);
-        $t=BloodTypes::select('amount')->where('id',$request->blood_type_id)->update([
-            'amount'=>$t-$request->amount
-        ]);
-
         return response()->json([
             "message"=>"taken_schedual Updated successfully!",
         ], Response::HTTP_ACCEPTED);}
@@ -142,20 +101,25 @@ class TakenRequestController extends Controller
          }
          
     }
-
-    /**
-     * Remove the specified resource from storage.
-     *
-     * @param  \App\Models\taken_request $donate_schedule
-     * @return \Illuminate\Http\Response
-     */
     public function destroy( $taken_request_id)
     {
-        // $donate = taken_request::find($donate_schedule->id);
         $taken=taken_request::find($taken_request_id)->delete();
         return response()->json([
             'message' => "donate_schedual deleted successfully!",
             'data' => $taken,
+        ], Response::HTTP_OK);
+    }
+    public function checkTakenRequest( $taken_request_id)
+    {
+        $blood=taken_request::select('blood_type_id')->where('id',$taken_request_id)->value('blood_type_id');
+        $takenBloodAmount = taken_request::select('amount')->where('id',$taken_request_id)->value('amount');
+        $prevAmount=BloodTypes::select('amount')->where('id',$blood)->value('amount');
+        BloodTypes::select('amount')->where('id',$blood)->update([
+            'amount'=> $prevAmount-$takenBloodAmount
+        ]);
+        $this->destroy($taken_request_id);
+        return response()->json([
+            'message' => "this taken checked success",
         ], Response::HTTP_OK);
     }
 }
